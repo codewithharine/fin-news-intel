@@ -8,6 +8,7 @@ from app.agents.impact_analysis import map_impact
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MOCK_NEWS_PATH = PROJECT_ROOT / "data" / "mock_news.json"
+STORIES_PATH = PROJECT_ROOT / "data" / "stories.json"
 
 
 def run_ingestion_pipeline():
@@ -16,7 +17,7 @@ def run_ingestion_pipeline():
       1) deduplication
       2) entity extraction
       3) impact mapping
-    and print a summary for each unique story.
+    and save a summary for each unique story into data/stories.json.
     """
     if not MOCK_NEWS_PATH.exists():
         print(f"❌ mock_news.json not found at {MOCK_NEWS_PATH}")
@@ -40,7 +41,7 @@ def run_ingestion_pipeline():
 
         if is_duplicate:
             print(f"🔁 Duplicate of story: {story_id} (sim={dedup_result['similarity']:.2f})")
-            # For duplicates, we don't need to recompute entities/impact
+            # For duplicates, we don't recompute entities/impact
             continue
         else:
             print(f"✨ New unique story: {story_id}")
@@ -64,16 +65,25 @@ def run_ingestion_pipeline():
         else:
             print("📊 Impacted stocks: None detected")
 
-        # Save to story_summaries if needed
+        # Save summary (we also keep published_at for later ranking if needed)
         story_summaries[story_id] = {
+            "story_id": story_id,
             "article_id": article["id"],
             "title": article["title"],
+            "body": article.get("body", ""),
+            "published_at": article.get("published_at", ""),
             "entities": entities,
             "impacted_stocks": impacted_stocks,
         }
 
+    # Save to data/stories.json
+    STORIES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with STORIES_PATH.open("w", encoding="utf-8") as f:
+        json.dump(list(story_summaries.values()), f, indent=2, ensure_ascii=False)
+
     print("\n✅ Ingestion pipeline finished.")
     print(f"Unique stories found: {len(story_summaries)}")
+    print(f"💾 Saved to: {STORIES_PATH}")
 
     return story_summaries
 
